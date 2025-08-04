@@ -14,6 +14,8 @@ import { ExportButton } from "@/components/export-button"
 import { ChatInterface } from "@/components/chat-interface"
 import { ContractQuickActions } from "@/components/contract-quick-actions"
 import { RiskAnalysisDashboard } from "@/components/risk-analysis-dashboard"
+import { ContractEditor } from "@/components/contract-editor"
+import { ThemeToggle } from "@/components/theme-toggle"
 import {
   ArrowLeft,
   Edit,
@@ -33,6 +35,7 @@ import {
   Zap,
   Info,
   History,
+  Bookmark,
 } from "lucide-react"
 import Link from "next/link"
 import { app } from "@/lib/firebaseClient";
@@ -58,6 +61,18 @@ interface Contract {
   terms?: any;
   content: string;
   highlights?: any[];
+  userHighlights?: Array<{
+    id: string;
+    start: number;
+    end: number;
+    text: string;
+    color: string;
+    note?: string;
+    type: 'important' | 'warning' | 'info' | 'custom';
+    userId?: string;
+    username?: string;
+    createdAt?: Date;
+  }>;
   previousContent?: string; // Added for diff
   [key: string]: any;
 }
@@ -96,6 +111,40 @@ export default function ContractViewPage({ params }: { params: Promise<{ id: str
   const [selectedChangeUser, setSelectedChangeUser] = useState<string | null>(null);
   const [selectedChangeDiff, setSelectedChangeDiff] = useState<{ prev: string, curr: string, timestamp: string, username: string } | null>(null);
   const [showChangeHistory, setShowChangeHistory] = useState(true);
+  const [userHighlights, setUserHighlights] = useState<Array<{
+    id: string;
+    start: number;
+    end: number;
+    text: string;
+    color: string;
+    note?: string;
+    type: 'important' | 'warning' | 'info' | 'custom';
+    userId?: string;
+    username?: string;
+    createdAt?: Date;
+  }>>([]);
+
+  // Highlight color constants
+  const HIGHLIGHT_COLORS = {
+    important: 'bg-yellow-300 text-yellow-900 border-yellow-400',
+    warning: 'bg-red-300 text-red-900 border-red-400',
+    info: 'bg-blue-300 text-blue-900 border-blue-400',
+    custom: 'bg-green-300 text-green-900 border-green-400',
+  }
+
+  const HIGHLIGHT_COLORS_BG = {
+    important: 'bg-yellow-200',
+    warning: 'bg-red-200',
+    info: 'bg-blue-200',
+    custom: 'bg-green-200',
+  }
+
+  const HIGHLIGHT_COLORS_BORDER = {
+    important: 'border-yellow-300',
+    warning: 'border-red-300',
+    info: 'border-blue-300',
+    custom: 'border-green-300',
+  }
 
   const unwrappedParams = React.use(params);
 
@@ -125,8 +174,10 @@ export default function ContractViewPage({ params }: { params: Promise<{ id: str
       const contractRef = doc(db, "contracts", unwrappedParams.id);
       const contractSnap = await getDoc(contractRef);
       if (contractSnap.exists()) {
-        setContractData(contractSnap.data() as Contract);
-        setOriginalContractData(JSON.parse(JSON.stringify(contractSnap.data())) as Contract);
+        const contractData = contractSnap.data() as Contract;
+        setContractData(contractData);
+        setOriginalContractData(JSON.parse(JSON.stringify(contractData)) as Contract);
+        setUserHighlights(contractData.userHighlights || []);
       } else {
         setContractData(null);
       }
@@ -162,13 +213,37 @@ export default function ContractViewPage({ params }: { params: Promise<{ id: str
 
   const handleContractUpdate = (updatedContent: string) => {
     if (!contractData) return;
-    const updatedContract = { ...contractData, content: updatedContent };
+    const updatedContract = { ...contractData, content: updatedContent, userHighlights };
     setContractData(updatedContract);
     if (typeof window !== 'undefined') {
       localStorage.setItem(`contract_${unwrappedParams.id}`, JSON.stringify(updatedContract));
     }
     // Save to Firestore
     saveContractToFirestore(updatedContract);
+  }
+
+  const handleHighlightsChange = (newHighlights: Array<{
+    id: string;
+    start: number;
+    end: number;
+    text: string;
+    color: string;
+    note?: string;
+    type: 'important' | 'warning' | 'info' | 'custom';
+    userId?: string;
+    username?: string;
+    createdAt?: Date;
+  }>) => {
+    setUserHighlights(newHighlights);
+    if (contractData) {
+      const updatedContract = { ...contractData, userHighlights: newHighlights };
+      setContractData(updatedContract);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`contract_${unwrappedParams.id}`, JSON.stringify(updatedContract));
+      }
+      // Save to Firestore
+      saveContractToFirestore(updatedContract);
+    }
   }
 
   const handleResetContract = () => {
@@ -522,6 +597,7 @@ export default function ContractViewPage({ params }: { params: Promise<{ id: str
                 contractContent={contractData.content}
               />
             )}
+            <ThemeToggle />
           </div>
         </div>
       </header>
@@ -623,79 +699,17 @@ export default function ContractViewPage({ params }: { params: Promise<{ id: str
               </CardContent>
             </Card>
 
-            {/* Contract Content */}
-            <Card className="aramco-card">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
-                  <Eye className="w-5 h-5" />
-                  Interactive Contract Document
-                  <Badge className="aramco-accent-blue text-xs">Click text for AI explanations</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div
-                  className="bg-white p-8 rounded-lg text-black font-mono text-sm leading-relaxed max-h-[600px] overflow-y-auto relative cursor-text select-text"
-                  onMouseUp={handleTextSelection}
-                >
-                  <pre
-                    className="whitespace-pre-wrap"
-                  >
-                    {showDiff && diffLines.length > 0
-                      ? contractData.content.split("\n").map((line, idx) => (
-                          <div
-                            key={idx}
-                            className={diffLines.includes(idx) ? "bg-yellow-200 text-black px-1 rounded transition" : undefined}
-                            style={{ display: "block" }}
-                          >
-                            {line}
-                          </div>
-                        ))
-                      : <span dangerouslySetInnerHTML={{ __html: highlightSearchTerm(contractData.content, searchTerm) }} />}
-                  </pre>
-
-                  {/* AI Explanation Tooltip */}
-                  {highlightedText && (
-                    <div
-                      className="fixed z-50 bg-aramco-dark-800 border border-aramco-dark-600 rounded-lg p-4 max-w-sm shadow-xl"
-                      style={{
-                        left: Math.min(explanationPosition.x, window.innerWidth - 400),
-                        top: Math.max(explanationPosition.y - 100, 10),
-                      }}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Lightbulb className="w-4 h-4 text-yellow-400" />
-                          <span className="text-white font-medium text-sm">AI Explanation</span>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={clearSelection}
-                          className="h-6 w-6 p-0 text-aramco-dark-400 hover:text-white"
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </div>
-
-                      <div className="mb-3 p-2 bg-aramco-dark-700 rounded text-xs text-aramco-dark-200 italic">
-                        "{highlightedText.length > 100 ? highlightedText.substring(0, 100) + "..." : highlightedText}"
-                      </div>
-
-                      <div className="text-sm text-slate-200">
-                        {isExplaining ? (
-                          <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 border-2 border-aramco-green-400 border-t-transparent rounded-full animate-spin"></div>
-                            <span>Getting AI explanation...</span>
-                          </div>
-                        ) : (
-                          aiExplanation
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            {/* Contract Editor */}
+            <ContractEditor
+              content={contractData.content}
+              onContentChange={handleContractUpdate}
+              highlights={userHighlights}
+              onHighlightsChange={handleHighlightsChange}
+              isReadOnly={permissionLevel === "read"}
+              contractId={unwrappedParams.id}
+              currentUserId={currentUserId || undefined}
+              currentUserName={currentUserName || undefined}
+            />
 
             {/* Risk Analysis */}
             {showRiskAnalysis && (
@@ -770,32 +784,72 @@ export default function ContractViewPage({ params }: { params: Promise<{ id: str
               </CardContent>
             </Card>
 
-            {/* Contract Terms */}
+            {/* Highlights & Annotations */}
             <Card className="aramco-card">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
-                  <Calendar className="w-5 h-5" />
-                  Key Terms
+                  <Bookmark className="w-5 h-5" />
+                  Highlights & Annotations ({userHighlights.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-slate-300">Start Date:</span>
-                  <span className="text-white">{contractData.terms?.startDate}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-300">End Date:</span>
-                  <span className="text-white">{contractData.terms?.endDate}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-300">Duration:</span>
-                  <span className="text-white">{contractData.terms?.duration}</span>
-                </div>
-                <Separator className="bg-slate-600" />
-                <div className="flex justify-between">
-                  <span className="text-slate-300">Total Value:</span>
-                  <span className="text-white font-semibold">{contractData.terms?.value}</span>
-                </div>
+              <CardContent>
+                {userHighlights.length === 0 ? (
+                  <div className="text-center py-4">
+                    <Bookmark className="w-8 h-8 mx-auto text-slate-400 mb-2" />
+                    <p className="text-slate-400 text-sm">No highlights yet</p>
+                    <p className="text-slate-500 text-xs">Select text in the contract to add highlights</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {userHighlights.map((highlight) => (
+                      <div
+                        key={highlight.id}
+                        className={`p-3 rounded-lg border-2 ${HIGHLIGHT_COLORS_BG[highlight.type]} ${HIGHLIGHT_COLORS_BORDER[highlight.type]}`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Badge className={`text-xs font-bold ${HIGHLIGHT_COLORS[highlight.type]}`}>
+                              {highlight.type.charAt(0).toUpperCase() + highlight.type.slice(1)}
+                            </Badge>
+                            <div className="flex items-center gap-1">
+                              <div className="w-4 h-4 rounded-full bg-aramco-blue-500 flex items-center justify-center text-white text-xs font-bold">
+                                {highlight.username?.[0]?.toUpperCase() || 'U'}
+                              </div>
+                              <span className="text-xs text-slate-300 font-medium">
+                                {highlight.username || 'Unknown User'}
+                              </span>
+                            </div>
+                          </div>
+                          {permissionLevel !== "read" && (
+                            <Button
+                              onClick={() => {
+                                const updatedHighlights = userHighlights.filter(h => h.id !== highlight.id)
+                                handleHighlightsChange(updatedHighlights)
+                              }}
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-500 hover:text-red-700 hover:bg-red-100 h-6 w-6 p-0"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
+                        <p className="text-xs font-medium mb-1 text-foreground leading-tight">"{highlight.text}"</p>
+                        {highlight.note && (
+                          <p className="text-xs text-muted-foreground italic mt-1">
+                            <MessageSquare className="w-3 h-3 inline mr-1" />
+                            {highlight.note}
+                          </p>
+                        )}
+                        {highlight.createdAt && (
+                          <p className="text-xs text-slate-400 mt-1">
+                            {new Date(highlight.createdAt).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
