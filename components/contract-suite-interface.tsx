@@ -215,7 +215,7 @@ const ContractSuiteInterface = () => {
   return (
     <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
       {/* Header */}
-      <header className="bg-blue-600 dark:bg-blue-800 p-4">
+      <header className="bg-blue-100 dark:bg-blue-600 p-4">
         <h1 className="text-2xl font-bold text-white">OpenAI Contract Assistant</h1>
         <p className="text-gray-400">Advanced AI-powered contract generation and analysis</p>
       </header>
@@ -228,7 +228,7 @@ const ContractSuiteInterface = () => {
               <div
                 className={`rounded-lg p-3 w-3/4 max-w-3/4 ${
                   message.role === "user"
-                    ? "bg-blue-200 dark:bg-blue-700 text-gray-800 dark:text-gray-200"
+                    ? "bg-blue-100 dark:bg-blue-200 text-gray-800 dark:text-gray-200"
                     : "bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
                 }`}
               >
@@ -275,7 +275,7 @@ const ContractSuiteInterface = () => {
           </Button>
           <label htmlFor="upload-file" className="cursor-pointer">
             <input type="file" id="upload-file" className="hidden" onChange={handleFileUpload} />
-            <Button variant="secondary" component="span">
+            <Button variant="secondary">
               Upload File
             </Button>
           </label>

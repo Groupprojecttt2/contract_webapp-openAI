@@ -232,6 +232,21 @@ export default function ContractViewPage({ params }: { params: Promise<{ id: str
     return text.replace(regex, '<mark class="bg-yellow-300 text-black px-1 rounded">$1</mark>')
   }
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "draft":
+        return "bg-yellow-500/20 border-l-4 border-yellow-500"
+      case "review":
+        return "bg-blue-100 dark:bg-blue-500/20 border-l-4 border-blue-200 dark:border-blue-500"
+      case "approved":
+        return "bg-green-500/20 border-l-4 border-green-500"
+      case "signed":
+        return "bg-purple-500/20 border-l-4 border-purple-500"
+      default:
+        return "bg-gray-500/20 border-l-4 border-gray-500"
+    }
+  }
+
   const getHighlightColor = (type: string) => {
     switch (type) {
       case "critical":
@@ -239,7 +254,7 @@ export default function ContractViewPage({ params }: { params: Promise<{ id: str
       case "financial":
         return "bg-green-500/20 border-l-4 border-green-500"
       case "timeline":
-        return "bg-blue-500/20 border-l-4 border-blue-500"
+        return "bg-blue-100 dark:bg-blue-500/20 border-l-4 border-blue-200 dark:border-blue-500"
       case "risk":
         return "bg-yellow-500/20 border-l-4 border-yellow-500"
       default:
@@ -527,7 +542,7 @@ export default function ContractViewPage({ params }: { params: Promise<{ id: str
 
         {/* Show update banner for owner if lastEditedBy is set and not the owner, with Show Changes icon */}
         {permissionLevel === "owner" && contractData?.lastEditedBy && contractData?.lastEditedBy !== currentUserName && (
-          <div className="mb-6 flex items-center gap-3 p-4 rounded-lg bg-blue-900/80 border border-blue-500/40 shadow-lg animate-glow">
+          <div className="mb-6 flex items-center gap-3 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/80 border border-blue-200 dark:border-blue-500/40 shadow-lg animate-glow">
             <Info className="w-6 h-6 text-blue-300" />
             <div className="flex-1">
               <span className="text-blue-200 font-semibold">This contract was updated by </span>
@@ -537,7 +552,7 @@ export default function ContractViewPage({ params }: { params: Promise<{ id: str
             </div>
             {contractData.previousContent && (
               <button
-                className={`ml-4 flex items-center gap-1 px-3 py-1 rounded bg-blue-700 text-blue-100 hover:bg-blue-600 transition font-semibold ${showDiff ? "ring-2 ring-blue-300" : ""}`}
+                className={`ml-4 flex items-center gap-1 px-3 py-1 rounded bg-blue-100 dark:bg-blue-700 text-blue-700 dark:text-blue-100 hover:bg-blue-200 dark:hover:bg-blue-600 transition font-semibold ${showDiff ? "ring-2 ring-blue-300" : ""}`}
                 onClick={() => setShowDiff(v => !v)}
                 title={showDiff ? "Hide changes" : "Show changes"}
               >
@@ -926,8 +941,8 @@ export default function ContractViewPage({ params }: { params: Promise<{ id: str
           </CardHeader>
           <CardContent className="space-y-2">
             {contractData.sharedWith.map((u: any) => (
-              <div key={u.userId} className="flex items-center gap-3 p-2 rounded bg-blue-900/40">
-                <div className="w-8 h-8 rounded-full bg-blue-700 flex items-center justify-center text-white font-bold">
+              <div key={u.userId} className="flex items-center gap-3 p-2 rounded bg-blue-50 dark:bg-blue-900/40">
+                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-700 flex items-center justify-center text-blue-700 dark:text-white font-bold">
                   {u.username?.[0]?.toUpperCase() || u.email?.[0]?.toUpperCase()}
                 </div>
                 <div className="flex-1">
@@ -945,7 +960,7 @@ export default function ContractViewPage({ params }: { params: Promise<{ id: str
       {permissionLevel === "owner" && changeLog.length > 0 && (
         <div className="flex items-center gap-2 mt-8 mb-2">
           <button
-            className={`px-3 py-1 rounded font-semibold flex items-center gap-2 transition ${showChangeHistory ? "bg-blue-700 text-blue-100 hover:bg-blue-600" : "bg-slate-700 text-slate-300 hover:bg-blue-700 hover:text-blue-100"}`}
+            className={`px-3 py-1 rounded font-semibold flex items-center gap-2 transition ${showChangeHistory ? "bg-blue-100 dark:bg-blue-700 text-blue-700 dark:text-blue-100 hover:bg-blue-200 dark:hover:bg-blue-600" : "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-blue-100 dark:hover:bg-blue-700 hover:text-blue-700 dark:hover:text-blue-100"}`}
             onClick={() => setShowChangeHistory(v => !v)}
             title={showChangeHistory ? "Hide Change History" : "Show Change History"}
           >
@@ -966,13 +981,13 @@ export default function ContractViewPage({ params }: { params: Promise<{ id: str
               {[...changeLog].reverse().map((entry, idx) => (
                 <button
                   key={entry.timestamp + entry.userId + idx}
-                  className={`px-3 py-1 rounded bg-blue-700 text-blue-100 hover:bg-blue-600 font-semibold flex items-center gap-2 ${selectedChangeUser === entry.userId && selectedChangeDiff?.timestamp === entry.timestamp ? "ring-2 ring-blue-300" : ""}`}
+                  className={`px-3 py-1 rounded bg-blue-100 dark:bg-blue-700 text-blue-700 dark:text-blue-100 hover:bg-blue-200 dark:hover:bg-blue-600 font-semibold flex items-center gap-2 ${selectedChangeUser === entry.userId && selectedChangeDiff?.timestamp === entry.timestamp ? "ring-2 ring-blue-300" : ""}`}
                   onClick={() => {
                     setSelectedChangeUser(entry.userId);
                     setSelectedChangeDiff({ prev: entry.previousContent, curr: entry.newContent, timestamp: entry.timestamp, username: entry.username });
                   }}
                 >
-                  <div className="w-7 h-7 rounded-full bg-blue-800 flex items-center justify-center text-white font-bold">
+                  <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-800 flex items-center justify-center text-blue-700 dark:text-white font-bold">
                     {entry.username?.[0]?.toUpperCase()}
                   </div>
                   <span>{entry.username}</span>

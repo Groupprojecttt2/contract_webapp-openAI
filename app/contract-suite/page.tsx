@@ -932,7 +932,7 @@ export default function ContractSuitePage() {
                   <div className="text-slate-400">No shared contracts found.</div>
                 ) : ( */}
                   {/* filteredShared.map((contract, idx) => ( // This line was removed as per the edit hint
-                    <div key={idx} className="bg-blue-900/30 rounded-xl p-4 border border-aramco-blue-500/20">
+                    <div key={idx} className="bg-blue-50 dark:bg-blue-900/30 rounded-xl p-4 border border-blue-200 dark:border-aramco-blue-500/20">
                       <h3 className="font-semibold text-white text-lg">{contract.title}</h3>
                       <div className="text-slate-300 text-sm mt-2 line-clamp-2 max-w-md">{contract.content ?? ""}</div>
                     </div>

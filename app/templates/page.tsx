@@ -526,7 +526,7 @@ PARTY 2: _________________________ DATE: _______`
                     <div className="flex-1">
                       <CardTitle className="text-white text-lg mb-2">{template.title}</CardTitle>
                       <div className="flex items-center gap-2 mb-2">
-                        <Badge className="bg-blue-600/20 text-blue-300 border-blue-600/30">{template.category}</Badge>
+                        <Badge className="bg-blue-100 dark:bg-blue-600/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-600/30">{template.category}</Badge>
                         <Badge variant="outline" className={`text-xs ${getComplexityColor(template.complexity)}`}>
                           {template.complexity}
                         </Badge>
