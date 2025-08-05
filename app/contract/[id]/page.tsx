@@ -53,6 +53,13 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
+interface Signature {
+  id: string;
+  data: string;
+  name: string;
+  position: { x: number; y: number };
+}
+
 interface Contract {
   title: string;
   type?: string;
@@ -61,6 +68,7 @@ interface Contract {
   terms?: any;
   content: string;
   highlights?: any[];
+  signatures?: Signature[];
   userHighlights?: Array<{
     id: string;
     start: number;
@@ -98,6 +106,7 @@ export default function ContractViewPage({ params }: { params: Promise<{ id: str
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [userSearch, setUserSearch] = useState("");
+  const [signatures, setSignatures] = useState<Signature[]>([]);
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [selectedPermission, setSelectedPermission] = useState<"read" | "edit">("read");
   const [sharing, setSharing] = useState(false);
@@ -178,6 +187,7 @@ export default function ContractViewPage({ params }: { params: Promise<{ id: str
         setContractData(contractData);
         setOriginalContractData(JSON.parse(JSON.stringify(contractData)) as Contract);
         setUserHighlights(contractData.userHighlights || []);
+        setSignatures(contractData.signatures || []);
       } else {
         setContractData(null);
       }
@@ -237,6 +247,19 @@ export default function ContractViewPage({ params }: { params: Promise<{ id: str
     setUserHighlights(newHighlights);
     if (contractData) {
       const updatedContract = { ...contractData, userHighlights: newHighlights };
+      setContractData(updatedContract);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`contract_${unwrappedParams.id}`, JSON.stringify(updatedContract));
+      }
+      // Save to Firestore
+      saveContractToFirestore(updatedContract);
+    }
+  }
+
+  const handleSignaturesChange = (newSignatures: Signature[]) => {
+    setSignatures(newSignatures);
+    if (contractData) {
+      const updatedContract = { ...contractData, signatures: newSignatures };
       setContractData(updatedContract);
       if (typeof window !== 'undefined') {
         localStorage.setItem(`contract_${unwrappedParams.id}`, JSON.stringify(updatedContract));
@@ -705,6 +728,8 @@ export default function ContractViewPage({ params }: { params: Promise<{ id: str
               onContentChange={handleContractUpdate}
               highlights={userHighlights}
               onHighlightsChange={handleHighlightsChange}
+              signatures={signatures}
+              onSignaturesChange={handleSignaturesChange}
               isReadOnly={permissionLevel === "read"}
               contractId={unwrappedParams.id}
               currentUserId={currentUserId || undefined}

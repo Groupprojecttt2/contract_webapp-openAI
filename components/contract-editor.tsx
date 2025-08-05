@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { SignaturePad, SignatureDisplay } from "@/components/signature-pad"
 import {
   Edit,
   Save,
@@ -25,6 +26,7 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
+  PenTool,
 } from "lucide-react"
 import {
   Popover,
@@ -54,11 +56,20 @@ interface Highlight {
   createdAt?: Date
 }
 
+interface Signature {
+  id: string
+  data: string
+  name: string
+  position: { x: number; y: number }
+}
+
 interface ContractEditorProps {
   content: string
   onContentChange: (newContent: string) => void
   highlights?: Highlight[]
   onHighlightsChange?: (highlights: Highlight[]) => void
+  signatures?: Signature[]
+  onSignaturesChange?: (signatures: Signature[]) => void
   isReadOnly?: boolean
   contractId?: string
   currentUserId?: string
@@ -91,6 +102,8 @@ export function ContractEditor({
   onContentChange,
   highlights = [],
   onHighlightsChange,
+  signatures = [],
+  onSignaturesChange,
   isReadOnly = false,
   contractId,
   currentUserId,
@@ -105,6 +118,7 @@ export function ContractEditor({
   const [highlightNote, setHighlightNote] = useState('')
   const [highlightType, setHighlightType] = useState<'important' | 'warning' | 'info' | 'custom'>('important')
   const [showHighlights, setShowHighlights] = useState(true)
+  const [showSignatures, setShowSignatures] = useState(true)
   const [editHistory, setEditHistory] = useState<string[]>([content])
   const [historyIndex, setHistoryIndex] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -206,23 +220,35 @@ export function ContractEditor({
 
   // Remove all auto-formatting logic. Render as plain preformatted text.
   const renderContentWithHighlights = () => {
-    if (!showHighlights || highlights.length === 0) {
-      // Render as preformatted text
-      return `<pre style='white-space: pre-wrap; font-family: inherit; font-size: inherit;'>${escapeHtml(editedContent)}</pre>`
+    let result = editedContent
+
+    // Apply highlights if enabled
+    if (showHighlights && highlights.length > 0) {
+      // Insert highlight markers into the plain text
+      const sortedHighlights = [...highlights].sort((a, b) => b.start - a.start)
+      sortedHighlights.forEach(highlight => {
+        const before = result.substring(0, highlight.start)
+        const after = result.substring(highlight.end)
+        const highlightedText = result.substring(highlight.start, highlight.end)
+        result = before + `[HIGHLIGHT:${highlight.id}:${highlight.type}]${escapeHtml(highlightedText)}[/HIGHLIGHT]` + after
+      })
     }
 
-    // Insert highlight markers into the plain text
-    let result = editedContent
-    const sortedHighlights = [...highlights].sort((a, b) => b.start - a.start)
-    sortedHighlights.forEach(highlight => {
-      const before = result.substring(0, highlight.start)
-      const after = result.substring(highlight.end)
-      const highlightedText = result.substring(highlight.start, highlight.end)
-      result = before + `[HIGHLIGHT:${highlight.id}:${highlight.type}]${escapeHtml(highlightedText)}[/HIGHLIGHT]` + after
-    })
+    // Replace signature placeholders with actual signatures
+    if (showSignatures && signatures.length > 0) {
+      signatures.forEach((signature) => {
+        const placeholder = `[${signature.name.toUpperCase()} SIGNATURE: _________________ DATE: _______]`
+        const signatureHtml = `
+          <span class="inline-block align-middle">
+            <img src="${signature.data}" alt="${signature.name} signature" class="inline-block max-w-24 max-h-12 object-contain border border-gray-300 rounded" />
+          </span>
+        `
+        result = result.replace(new RegExp(escapeHtml(placeholder), 'g'), signatureHtml)
+      })
+    }
 
     // Replace highlight markers with HTML (allow newlines in text)
-    return `<pre style='white-space: pre-wrap; font-family: inherit; font-size: inherit;'>` +
+    let htmlResult = `<pre style='white-space: pre-wrap; font-family: inherit; font-size: inherit;'>` +
       result.replace(
         /\[HIGHLIGHT:([^:]+):([^\]]+)\]([\s\S]*?)\[\/HIGHLIGHT\]/g,
         (match, id, type, text) => {
@@ -233,6 +259,8 @@ export function ContractEditor({
             title="${highlight?.note || text}">${text}</span>`
         }
       ) + `</pre>`
+
+    return htmlResult
   }
 
   // Helper to escape HTML special characters
@@ -249,6 +277,62 @@ export function ContractEditor({
         description: `Highlight: "${highlight.text}"`
       })
     }
+  }
+
+  const handleSignatureSave = (signatureData: string, signatureName: string) => {
+    if (!onSignaturesChange) return
+
+    const newSignature: Signature = {
+      id: Date.now().toString(),
+      data: signatureData,
+      name: signatureName,
+      position: { x: 0, y: 0 }
+    }
+
+    const updatedSignatures = [...signatures, newSignature]
+    onSignaturesChange(updatedSignatures)
+    toast.success(`${signatureName} added successfully!`)
+  }
+
+  const handleSignatureRemove = (signatureId: string) => {
+    if (!onSignaturesChange) return
+
+    const updatedSignatures = signatures.filter(s => s.id !== signatureId)
+    onSignaturesChange(updatedSignatures)
+    toast.success("Signature removed successfully!")
+  }
+
+  const insertSignaturePlaceholder = (signatureName: string) => {
+    const placeholder = `[${signatureName.toUpperCase()} SIGNATURE: _________________ DATE: _______]`
+    const newContent = editedContent + placeholder
+    setEditedContent(newContent)
+    addToHistory(newContent)
+  }
+
+  const insertCompleteSignatureBlock = () => {
+    const signatureBlock = `
+
+**14. SIGNATURE BLOCKS**
+
+IN WITNESS WHEREOF, the parties hereto have executed this Agreement as of the date first written above.
+
+**Party A:**
+Signature: [PARTY A SIGNATURE: _________________ DATE: _______]
+Name: _________________
+Date: _________________
+
+**Party B:**
+Signature: [PARTY B SIGNATURE: _________________ DATE: _______]
+Name: _________________
+Title: _________________
+Date: _________________
+
+**DISCLAIMER:**
+This document has been generated using AI technology. Please review all terms and conditions carefully before signing.`
+    
+    const newContent = editedContent + signatureBlock
+    setEditedContent(newContent)
+    addToHistory(newContent)
   }
 
   return (
@@ -333,6 +417,17 @@ export function ContractEditor({
                 <Highlighter className="w-4 h-4 mr-2" />
                 {showHighlights ? "Hide" : "Show"} Highlights
               </Button>
+
+              {/* Signature Toggle */}
+              <Button
+                onClick={() => setShowSignatures(!showSignatures)}
+                variant="outline"
+                size="sm"
+                className={`${showSignatures ? 'aramco-accent-green' : 'aramco-button-secondary'}`}
+              >
+                <PenTool className="w-4 h-4 mr-2" />
+                {showSignatures ? "Hide" : "Show"} Signatures
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -364,6 +459,70 @@ export function ContractEditor({
           )}
         </CardContent>
       </Card>
+
+      {/* Signature Controls - Only show when editing */}
+      {showSignatures && isEditing && (
+        <Card className="aramco-card">
+          <CardHeader>
+            <CardTitle className="text-foreground flex items-center gap-2">
+              <PenTool className="w-5 h-5" />
+              Add Party Signatures
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              {/* Signature Controls */}
+              <div className="flex flex-wrap gap-2">
+                <SignaturePad
+                  onSignatureSave={handleSignatureSave}
+                  signatureName="Party A"
+                  className="aramco-button-secondary"
+                />
+                <SignaturePad
+                  onSignatureSave={handleSignatureSave}
+                  signatureName="Party B"
+                  className="aramco-button-secondary"
+                />
+              </div>
+
+              {/* Insert Signature Block */}
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-foreground">Insert Signature Block:</h4>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={insertCompleteSignatureBlock}
+                    className="aramco-button-secondary"
+                  >
+                    Insert Complete Signature Block
+                  </Button>
+                </div>
+              </div>
+
+              {/* Insert Individual Signatures */}
+              {signatures.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-foreground">Insert Individual Signatures:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {signatures.map((signature) => (
+                      <Button
+                        key={signature.id}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => insertSignaturePlaceholder(signature.name)}
+                        className="aramco-button-secondary"
+                      >
+                        Insert {signature.name}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Highlight Dialog */}
       <Dialog open={showHighlightDialog} onOpenChange={setShowHighlightDialog}>
